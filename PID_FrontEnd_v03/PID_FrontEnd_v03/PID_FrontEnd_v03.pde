@@ -6,13 +6,13 @@
  *
  * This application is designed to interface with an
  * arduino running the PID Library.  From this Control
- * Panel you can observe & adjust PID performance in 
+ * Panel you can observe & adjust PID performance in
  * real time
  *
  * The ControlP5 library is required to run this sketch.
  * files and install instructions can be found at
  * http://www.sojamo.de/libraries/controlP5/
- * 
+ *
  ********************************************************/
 
 import java.nio.ByteBuffer;
@@ -22,32 +22,35 @@ import controlP5.*;
 /***********************************************
  * User spcification section
  **********************************************/
-int windowWidth = 1200;      // set the size of the 
-int windowHeight = 800;     // form
-float x_anterior = 0;
+ // define a largura e altura da janela de dentro osciloscopio
+int windowWidth = 1200;
+int windowHeight = 800;
+// é utilizado na funcao Position() para guardar o valor anterior setado pelo knoob
+float xAnterior = 0;
+// define o numero minimo da escala vertical de forma global e só pode ser alterada atraves do field minimoY e maximoY
 float ScaleMinGlobal = 0;
 float ScaleMaxGlobal = 1024;
-
-float InScaleMin = ScaleMinGlobal;       // set the Y-Axis Min
-float InScaleMax = ScaleMaxGlobal;    // and Max for both
-//float OutScaleMin = 0;      // the top and 
-//float OutScaleMax = 255;    // bottom trends
-
-
-int windowSpan = 10000;    // number of mS into the past you want to display 300000 = 0.3 segundos
+// guarda o numero minimo em tempo de execucao é utilizado pela funcao zoom pra modificar a escala em tempo real
+float InScaleMin = ScaleMinGlobal;
+float InScaleMax = ScaleMaxGlobal;
+// variaveis booleanas de controle de funcoes em tempo real
+boolean pause = false; // serve pra parar execução do programa, usado na funcao draw() que desenha a tela setado na funcao pause
+boolean movimentarGrid = false;// serve para controlar se a grid vai se mover ou não usado pelo toogle button grid setado na funcao grid
+//se refere a quantos Microssegundos terá cada quadrado da grid
+int windowSpan = 300000;    // number of mS into the past you want to display 300000 = 0.3 segundos
+//Velocidade de refesh(redesenho) da tela
 int refreshRate = 100;      // how often you want the graph to be reDrawn;
 
+//essa parte nao mudei nada
 //float displayFactor = 1; //display Time as Milliseconds
 //float displayFactor = 1000; //display Time as Seconds
 float displayFactor = 60000; //display Time as Minutes
-
-String outputFileName = ""; // if you'd like to output data to 
-// a file, specify the path here
-
+//acredito ser a variavelque guarda o nome do arquivo que iremos salvar
+String outputFileName = ""; // if you'd like to output data to  a file, specify the path here
 /***********************************************
  * end user spec
  **********************************************/
-
+ //nao mexi nessa parte
 int nextRefresh;
 int arrayLength = windowSpan / refreshRate+1;
 int[] InputData = new int[arrayLength];     //we might not need them this big, but
@@ -60,8 +63,8 @@ float outputHeight = (windowHeight-70)*1/3;
 float ioLeft = 150, ioWidth = windowWidth-ioLeft-50;
 float ioRight = ioLeft+ioWidth;
 float pointWidth= (ioWidth)/float(arrayLength-1);
-
-int vertCount = 10;
+//se refere a quantidade de linhas verticais terana tela
+int vertCount = 20;
 
 int nPoints = 0;
 
@@ -69,189 +72,218 @@ float Input, Setpoint, Output;
 
 boolean madeContact =false;
 boolean justSent = true;
-
+// declara os elementos de GUI
 Serial myPort;
-
 ControlP5 controlP5;
-controlP5.Button SetButton;
+controlP5.Button SetButton, PauseButton;
+controlP5.Toggle ToggleGrid;
 controlP5.Textlabel ss;
-controlP5.Textfield Ymin, Ymax;
+controlP5.Textfield MinimoY, MaximoY;
 controlP5.Slider slider;
 controlP5.Knob Knob_time, Knob_zoom, Knob_position;
 PrintWriter output;
-PFont AxisFont, TitleFont; 
+PFont AxisFont, TitleFont;
 
 void setup(){
-  frameRate(10);
-  //size(windowWidth , windowHeight);
-  size(1200 , 500);
-  println(Serial.list());                                           // * Initialize Serial
-  myPort = new Serial(this, Serial.list()[0], 9600);                //   Communication with
-  myPort.bufferUntil(10);                                           //   the Arduino
+        frameRate(10);
+        size(1200 , 550); //define tamanho da janela principal
+        println(Serial.list()); //printa lista de portas conectadas
+        myPort = new Serial(this, Serial.list()[0], 9600);     //  inicia umanova conexao
+        myPort.bufferUntil(10);                                //define buffer
+        //  Inicializa a classe responsavel pelacriacao de GUI
+        controlP5 = new ControlP5(this);
+        //cria os elementos de GUI
+        MinimoY = controlP5.addTextfield("Minimo Y",20,10,60,20);           //   Text Fields we'll be
+        MaximoY = controlP5.addTextfield("Maximo Y",20,50,60,20);
+        SetButton = controlP5.addButton("Set_scale",0.0,20,425,60,20);      //
+        PauseButton = controlP5.addButton("Pause",0.0,20,475,60,20);      //
+        //esse slider é a barra deslizante
+         //slider = controlP5.addSlider("slider").setRange(100,10000).setValue(10000).setPosition(10,250).setSize(90,20);
+        Knob_time = controlP5.addKnob("Time").setRange(1000,300000).setValue(300000).setPosition(10,290).setRadius(50).setDragDirection(Knob.VERTICAL);
+        Knob_zoom = controlP5.addKnob("Zoom").setRange(0,100).setValue(0).setPosition(10,90).setRadius(25).setDragDirection(Knob.VERTICAL);
+        Knob_position = controlP5.addKnob("Position").setRange(ScaleMinGlobal,ScaleMaxGlobal).setValue(512).setPosition(80,90).setRadius(25).setDragDirection(Knob.VERTICAL);
+        ToggleGrid = controlP5.addToggle("Mover_grid").setPosition(20,500).setSize(50,20).setValue(true);
 
-  controlP5 = new ControlP5(this);    // * Initialize the various
-       
-  Ymin = controlP5.addTextfield("Minimo Y",20,10,60,20);           //   Text Fields we'll be
-  Ymax = controlP5.addTextfield("Maximo Y",20,50,60,20);  
-  SetButton = controlP5.addButton("Set_scale",0.0,20,425,60,20);      //
-   //slider = controlP5.addSlider("slider").setRange(100,10000).setValue(10000).setPosition(10,250).setSize(90,20); 
-  Knob_time = controlP5.addKnob("Time").setRange(1000,10000).setValue(1000).setPosition(10,290).setRadius(50).setDragDirection(Knob.VERTICAL);
-  Knob_zoom = controlP5.addKnob("Zoom").setRange(0,100).setValue(0).setPosition(10,90).setRadius(25).setDragDirection(Knob.VERTICAL);
-  Knob_position = controlP5.addKnob("Position").setRange(ScaleMinGlobal,ScaleMaxGlobal).setValue(512).setPosition(80,90).setRadius(25).setDragDirection(Knob.VERTICAL);
-  AxisFont = loadFont("axis.vlw");
-  TitleFont = loadFont("Titles.vlw");
-  nextRefresh=millis();
-  if (outputFileName!="") output = createWriter(outputFileName);
+        AxisFont = loadFont("axis.vlw");
+        TitleFont = loadFont("Titles.vlw");
+        nextRefresh=millis();
+        if (outputFileName!="") output = createWriter(outputFileName);
 }
+//toggle para pausar a execucao do redesenho do programa, usa a variavel pause na funcao draw()
+void Pause(){
+        if(!pause){
+          pause = true;
+        }else{
+          pause = false;
+        }
+}
+//toggle para parar a movimentacao só da gridline, usado na funcao drawGraph()
+void Mover_grid(){
+       if(!movimentarGrid){
+          movimentarGrid = true;
+        }else{
+          movimentarGrid = false;
+        }
+}
+//Knob, faz calculo de percentagem do valor lido com relacao ao valor de tamanho de tela globalscale
+//e acrescenta este valor na escala minima e subtrai da maxima, pra dar o efeito de zoom
 void Zoom(){
-  float x1 = (ScaleMinGlobal*Knob_zoom.getValue())/100;//é calculado o zoom em porcentagem em cima do valor setado no globalscale
-  float x2 = (ScaleMaxGlobal*Knob_zoom.getValue())/100;
-  InScaleMin = ScaleMinGlobal + x1;
-  InScaleMax = ScaleMaxGlobal - x2;
+        float x1 = (ScaleMinGlobal*Knob_zoom.getValue())/100;//é calculado o zoom em porcentagem em cima do valor setado no globalscale
+        float x2 = (ScaleMaxGlobal*Knob_zoom.getValue())/100;
+        InScaleMin = ScaleMinGlobal + x1;
+        InScaleMax = ScaleMaxGlobal - x2;
 }
-void Position(){  
-  float x = 0;
-  
-  println(Knob_position.getValue());
-  
-  if(Knob_position.getValue() < x_anterior){
-    x = -5;
-  }else if(Knob_position.getValue() > x_anterior){
-    x = 5;
-  }
-  println(x);
-  if((InScaleMin + x) >= ScaleMinGlobal && (InScaleMax + x) <= ScaleMaxGlobal ){
-    InScaleMin = InScaleMin + x;
-    InScaleMax = InScaleMax + x;
-    println("dentro do intervalo");
-  }
-  x_anterior = Knob_position.getValue();
-
+//Knob,
+void Position(){
+        float x = 0;//valor a ser adicionado ou subtraido no limite superior ou inferior da escala para dar efeito de deslizar
+        println(Knob_position.getValue());
+        if(Knob_position.getValue() < xAnterior){//se a leitura atual for um numero menor que o lido anteriormente
+          x = -5;
+        }else if(Knob_position.getValue() > xAnterior){//se a leitura atual for um numero menor que o lido anteriormente
+          x = 5;
+        }
+        println(x);
+        //aqui testa se asmodificacoes no espaço da janela obedecem os limites globais setados se sim executa o deslize casocontrario nao faz nada
+        if((InScaleMin + x) >= ScaleMinGlobal && (InScaleMax + x) <= ScaleMaxGlobal ){
+          InScaleMin = InScaleMin + x; //aqui esta somando mais nao necessariamente com um numero positivo mas tbm com negativo
+          InScaleMax = InScaleMax + x;//ou seja uma subtracao de acordo com o que foi setado no bloco acima
+          println("dentro do intervalo");
+        }
+        xAnterior = Knob_position.getValue();//guarda o valor lido atualmente
 }
-
+//Button, salva as configuraçoes colocadas nos fields minimoY e maximoY
 void Set_scale(){
-  ScaleMinGlobal = Float.parseFloat( Ymin.getValueLabel().getText());
-  ScaleMaxGlobal = Float.parseFloat( Ymax.getValueLabel().getText());
-  InScaleMin = ScaleMinGlobal;
-  InScaleMax = ScaleMaxGlobal;
+        ScaleMinGlobal = Float.parseFloat( MinimoY.getValueLabel().getText());
+        ScaleMaxGlobal = Float.parseFloat( MaximoY.getValueLabel().getText());
+        //reatribui as novas confiruraçoes de escala globais para as configuraçoes ajustaveis
+        InScaleMin = ScaleMinGlobal;
+        InScaleMax = ScaleMaxGlobal;
 }
+//Knob, modifica a variavel windowSpan que se refere a quantos Microssegundos por quadrado definindo a velocidade da execucao
+// e recalcula todas as variaveis que dependem desse parametro
 void Time(){
-windowSpan = (int) Knob_time.getValue();
- 
-arrayLength = windowSpan / refreshRate+1;
-InputData = new int[arrayLength];     //we might not need them this big, but
-inputHeight = (windowHeight-70)*2/3;
-outputTop = inputHeight+50;
-outputHeight = (windowHeight-70)*1/3;
-ioLeft = 150;
-ioWidth = windowWidth-ioLeft-50;
-ioRight = ioLeft+ioWidth;
-nPoints = 0;
-pointWidth= (ioWidth)/float(arrayLength-1);
+        windowSpan = (int) Knob_time.getValue();
+        arrayLength = windowSpan / refreshRate+1;
+        InputData = new int[arrayLength];     //we might not need them this big, but
+        inputHeight = (windowHeight-70)*2/3;
+        outputTop = inputHeight+50;
+        outputHeight = (windowHeight-70)*1/3;
+        ioLeft = 150;
+        ioWidth = windowWidth-ioLeft-50;
+        ioRight = ioLeft+ioWidth;
+        nPoints = 0;
+        pointWidth= (ioWidth)/float(arrayLength-1);
 }
-
+//loop principal que desenha todas as funcoes
 void draw(){
-  background(200);
-  drawGraph();
-  drawButtonArea();
+      if(pause){//se pausar ele nao desenha nada e fica o ultimo desenho parado
+
+      }else{
+      background(200);
+      drawGraph();
+      drawButtonArea();
+      }
 }
-
+//desenha o grafico
 void drawGraph(){
-  //draw Base, gridlines
-  stroke(0);
-  fill(230);
-  rect(ioLeft, inputTop,ioWidth-1 , inputHeight);
-  //rect(ioLeft, outputTop, ioWidth-1, outputHeight);
-  stroke(100);
+      //draw Base, gridlines
+      stroke(0);
+      fill(230);
+      rect(ioLeft, inputTop,ioWidth-1 , inputHeight);
+      //rect(ioLeft, outputTop, ioWidth-1, outputHeight);
+      stroke(100);
+      //Section Titles
+      textFont(TitleFont);
+      fill(255);
+      text("Osciloscópio",(int)ioLeft+10,(int)inputTop-5);
+      //GridLines and Titles
+      textFont(AxisFont);
+      //horizontal grid lines
+      int interval = (int)inputHeight/10;
+      for(int i=0;i<11;i++)  {
+        if(i>0&&i<10) line(ioLeft+1,inputTop+i*interval,ioRight-2,inputTop+i*interval);
+        text(str((InScaleMax-InScaleMin)/10*(float)(10-i)+InScaleMin),ioRight+10,inputTop+i*interval+9);
+      }
+      //vertical grid lines and TimeStamps
+      int elapsedTime = millis();
+      interval = (int)ioWidth/vertCount;
+      int shift = elapsedTime*(int)ioWidth / windowSpan;
+      shift %=interval;
 
-  //Section Titles
-  textFont(TitleFont);
-  fill(255);
-  text("Osciloscópio",(int)ioLeft+10,(int)inputTop-5);
-  
-  //GridLines and Titles
-  textFont(AxisFont);
-  //horizontal grid lines
-  int interval = (int)inputHeight/5;
-  for(int i=0;i<6;i++)  {
-    if(i>0&&i<5) line(ioLeft+1,inputTop+i*interval,ioRight-2,inputTop+i*interval);
-    text(str((InScaleMax-InScaleMin)/5*(float)(5-i)+InScaleMin),ioRight+5,inputTop+i*interval+4);
-  }
-  //vertical grid lines and TimeStamps
-  int elapsedTime = millis();
-  interval = (int)ioWidth/vertCount;
-  int shift = elapsedTime*(int)ioWidth / windowSpan;
-  shift %=interval;
+      int iTimeInterval = windowSpan/vertCount;
+      float firstDisplay = (float)(iTimeInterval*(elapsedTime/iTimeInterval))/displayFactor;
+      float timeInterval = (float)(iTimeInterval)/displayFactor;
+      for(int i=0;i<vertCount;i++){
+        int x = (int)ioRight-shift-2-i*interval;
+        //aqui controlo se vou desenhar linhas verticais dinamicas ou estaticas
+      if(!movimentarGrid){
+         for(int j=0;j<25;j++){//estaticas
+            line(50*j,inputTop+1,50*j,inputTop+inputHeight-1);
+         }
+      }else{//dinamicas
+          line(x,inputTop+1,x,inputTop+inputHeight-1);
+      }
 
-  int iTimeInterval = windowSpan/vertCount;
-  float firstDisplay = (float)(iTimeInterval*(elapsedTime/iTimeInterval))/displayFactor;
-  float timeInterval = (float)(iTimeInterval)/displayFactor;
-  for(int i=0;i<vertCount;i++){
-    int x = (int)ioRight-shift-2-i*interval;
+        float t = firstDisplay-(float)i*timeInterval;
+        if(t>=0)  text(str(t),x,outputTop+outputHeight+10);
+      }
+      // add the latest data to the data Arrays.  the values need
+      // to be massaged to get them to graph correctly.  they
+      // need to be scaled to fit where they're going, and
+      // because 0, 0 is the top left, we need to flip the values.
+      // this is easier than having the user stand on their head
+      // to read the graph.
+      if(millis() > nextRefresh && madeContact){
+        nextRefresh += refreshRate;
+        for(int i=nPoints-1;i>0;i--){
+          InputData[i]=InputData[i-1];
+          //SetpointData[i]=SetpointData[i-1];
+         // OutputData[i]=OutputData[i-1];
+        }
+        if (nPoints < arrayLength) nPoints++;
 
-    line(x,inputTop+1,x,inputTop+inputHeight-1);
-    
+        InputData[0] = int(inputHeight)-int(inputHeight*(Input-InScaleMin)/(InScaleMax-InScaleMin));
 
-    float t = firstDisplay-(float)i*timeInterval;
-    if(t>=0)  text(str(t),x,outputTop+outputHeight+10);
-  }
-  // add the latest data to the data Arrays.  the values need
-  // to be massaged to get them to graph correctly.  they 
-  // need to be scaled to fit where they're going, and 
-  // because 0, 0 is the top left, we need to flip the values.
-  // this is easier than having the user stand on their head
-  // to read the graph.
-  if(millis() > nextRefresh && madeContact){
-    nextRefresh += refreshRate;
-    for(int i=nPoints-1;i>0;i--){
-      InputData[i]=InputData[i-1];
-      //SetpointData[i]=SetpointData[i-1];
-     // OutputData[i]=OutputData[i-1];
-    }
-    if (nPoints < arrayLength) nPoints++;
+      }
+      //draw lines for the input, setpoint, and output
+      strokeWeight(2);
+      for(int i=0; i<nPoints-2; i++)  {
+        int X1 = int(ioRight-2-float(i)*pointWidth);
+        int X2 = int(ioRight-2-float(i+1)*pointWidth);
+        boolean y1Above, y1Below, y2Above, y2Below;
 
-    InputData[0] = int(inputHeight)-int(inputHeight*(Input-InScaleMin)/(InScaleMax-InScaleMin));
-    
-  }
-  //draw lines for the input, setpoint, and output
-  strokeWeight(2);
-  for(int i=0; i<nPoints-2; i++)  {
-    int X1 = int(ioRight-2-float(i)*pointWidth);
-    int X2 = int(ioRight-2-float(i+1)*pointWidth);
-    boolean y1Above, y1Below, y2Above, y2Below;
+        //DRAW THE INPUT
+        boolean drawLine=true;
+        stroke(255,0,0);
+        int Y1 = InputData[i];
+        int Y2 = InputData[i+1];
 
-    //DRAW THE INPUT
-    boolean drawLine=true;
-    stroke(255,0,0);
-    int Y1 = InputData[i];
-    int Y2 = InputData[i+1];
+        y1Above = (Y1>inputHeight);                     // if both points are outside
+        y1Below = (Y1<0);                               // the min or max, don't draw the
+        y2Above = (Y2>inputHeight);                     // line.  if only one point is
+        y2Below = (Y2<0);                               // outside constrain it to the limit,
+        if(y1Above){
+          if(y2Above) drawLine=false;                   //
+          else if(y2Below) {                            //
+            Y1 = (int)inputHeight;                      //
+            Y2 = 0;                                     //
+          }else Y1 = (int)inputHeight;                   //
+        }else if(y1Below){                                //
+          if(y2Below) drawLine=false;                   //
+          else if(y2Above) {                            //
+            Y1 = 0;                                     //
+            Y2 = (int)inputHeight;                      //
+          }else Y1 = 0;                                  //
+        }else{                                               //
+          if(y2Below) Y2 = 0;                           //
+          else if(y2Above) Y2 = (int)inputHeight;       //
+        }                                               //
 
-    y1Above = (Y1>inputHeight);                     // if both points are outside 
-    y1Below = (Y1<0);                               // the min or max, don't draw the 
-    y2Above = (Y2>inputHeight);                     // line.  if only one point is 
-    y2Below = (Y2<0);                               // outside constrain it to the limit, 
-    if(y1Above){ 
-      if(y2Above) drawLine=false;                   //
-      else if(y2Below) {                            //
-        Y1 = (int)inputHeight;                      //
-        Y2 = 0;                                     //
-      }else Y1 = (int)inputHeight;                   //
-    }else if(y1Below){                                //
-      if(y2Below) drawLine=false;                   //
-      else if(y2Above) {                            //
-        Y1 = 0;                                     //
-        Y2 = (int)inputHeight;                      //
-      }else Y1 = 0;                                  //
-    }else{                                               //
-      if(y2Below) Y2 = 0;                           //
-      else if(y2Above) Y2 = (int)inputHeight;       //
-    }                                               //
-
-    if(drawLine){
-      line(X1,Y1+inputTop, X2, Y2+inputTop);
-    }   
-  }
-  strokeWeight(1); 
+        if(drawLine){
+          line(X1,Y1+inputTop, X2, Y2+inputTop);
+        }
+      }
+      strokeWeight(1);
 }
 
 void drawButtonArea(){
@@ -259,55 +291,6 @@ void drawButtonArea(){
   fill(100);
   rect(0, 0, ioLeft, windowHeight);
 }
-/*
-void Toggle_AM() {
-  if(AMLabel.getValueLabel().getText()=="Manual") 
-  {
-    AMLabel.setValue("Automatic");
-  }
-  else
-  {
-    AMLabel.setValue("Manual");   
-  }
-}
-
-
-void Toggle_DR() {
-  if(DRLabel.getValueLabel().getText()=="Direct") 
-  {
-    DRLabel.setValue("Reverse");
-  }
-  else
-  {
-    DRLabel.setValue("Direct");   
-  }
-}*/
-
-// Sending Floating point values to the arduino
-// is a huge pain.  if anyone knows an easier
-// way please let know.  the way I'm doing it:
-// - Take the 6 floats we need to send and
-//   put them in a 6 member float array.
-// - using the java ByteBuffer class, convert
-//   that array to a 24 member byte array
-// - send those bytes to the arduino
-/*void Send_To_Arduino(){
-  float[] toSend = new float[6];
-
-  toSend[0] = float(SPField.getText());
-  toSend[1] = float(InField.getText());
-  toSend[2] = float(OutField.getText());
-  toSend[3] = float(PField.getText());
-  toSend[4] = float(IField.getText());
-  toSend[5] = float(DField.getText());
-  Byte a = (AMLabel.getValueLabel().getText()=="Manual")?(byte)0:(byte)1;
-  Byte d = (DRLabel.getValueLabel().getText()=="Direct")?(byte)0:(byte)1;
-  myPort.write(a);
-  myPort.write(d);
-  myPort.write(floatArrayToByteArray(toSend));
-  justSent=true;
-} */
-
 
 byte[] floatArrayToByteArray(float[] input){
   int len = 4*input.length;
@@ -315,7 +298,7 @@ byte[] floatArrayToByteArray(float[] input){
   byte[] b = new byte[4];
   byte[] out = new byte[len];
   ByteBuffer buf = ByteBuffer.wrap(b);
-  for(int i=0;i<input.length;i++) 
+  for(int i=0;i<input.length;i++)
   {
     buf.position(0);
     buf.putFloat(input[i]);
@@ -345,7 +328,7 @@ void serialEvent(Serial myPort)
     //AMCurrent.setValue(trim(s[7]));   //
     //DRCurrent.setValue(trim(s[8]));
     if(justSent){                    // * if this is the first read
-                                     //   since we sent values to 
+                                     //   since we sent values to
      // SPField.setText(trim(s[1]));    //   the arduino,  take the
       //InField.setText(trim(s[2]));    //   current values and put
       //OutField.setText(trim(s[3]));   //   them into the input fields
