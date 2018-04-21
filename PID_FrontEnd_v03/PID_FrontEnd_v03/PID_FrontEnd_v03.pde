@@ -26,7 +26,7 @@ import controlP5.*;
 int windowWidth = 1200;
 int windowHeight = 800;
 // é utilizado na funcao Position() para guardar o valor anterior setado pelo knoob
-float xAnterior = 0;
+float xAnterior = 0, valorPosition = 0;//valor position é o valor atual da posição 
 // define o numero minimo da escala vertical de forma global e só pode ser alterada atraves do field minimoY e maximoY
 float ScaleMinGlobal = 0;
 float ScaleMaxGlobal = 1024;
@@ -75,12 +75,12 @@ boolean justSent = true;
 // declara os elementos de GUI
 Serial myPort;
 ControlP5 controlP5;
-controlP5.Button SetButton, PauseButton;
+controlP5.Button SetButton, PauseButton, PositionIncrement, PositionDecrement;
 controlP5.Toggle ToggleGrid;
 controlP5.Textlabel ss;
 controlP5.Textfield MinimoY, MaximoY;
 controlP5.Slider slider;
-controlP5.Knob Knob_time, Knob_zoom, Knob_position;
+controlP5.Knob Knob_time, Knob_zoom;
 PrintWriter output;
 PFont AxisFont, TitleFont;
 
@@ -93,22 +93,83 @@ void setup(){
         //  Inicializa a classe responsavel pelacriacao de GUI
         controlP5 = new ControlP5(this);
         //cria os elementos de GUI
-        MinimoY = controlP5.addTextfield("Minimo Y",20,10,60,20);           //   Text Fields we'll be
-        MaximoY = controlP5.addTextfield("Maximo Y",20,50,60,20);
-        SetButton = controlP5.addButton("Set_scale",0.0,20,425,60,20);      //
-        PauseButton = controlP5.addButton("Pause",0.0,20,475,60,20);      //
+        MinimoY = controlP5.addTextfield("Minimo Y",42,10,60,20);           //   Text Fields we'll be
+        MaximoY = controlP5.addTextfield("Maximo Y",42,50,60,20);
+
+        SetButton = controlP5.addButton("Set_scale",0.0,45,425,60,20);      //
+        PauseButton = controlP5.addButton("Pause",0.0,45,475,60,20);      //
+        
         //esse slider é a barra deslizante
          //slider = controlP5.addSlider("slider").setRange(100,10000).setValue(10000).setPosition(10,250).setSize(90,20);
-        Knob_time = controlP5.addKnob("Time").setRange(1000,300000).setValue(300000).setPosition(10,290).setRadius(50).setDragDirection(Knob.VERTICAL);
-        Knob_zoom = controlP5.addKnob("Zoom").setRange(0,100).setValue(0).setPosition(10,90).setRadius(25).setDragDirection(Knob.VERTICAL);
-        Knob_position = controlP5.addKnob("Position").setRange(ScaleMinGlobal,ScaleMaxGlobal).setValue(512).setPosition(80,90).setRadius(25).setDragDirection(Knob.VERTICAL);
-        ToggleGrid = controlP5.addToggle("Mover_grid").setPosition(20,500).setSize(50,20).setValue(true);
+        Knob_time = controlP5.addKnob("Time").setRange(300000,1000).setValue(300000).setPosition(25,290).setRadius(50).setDragDirection(Knob.VERTICAL);
+        Knob_zoom = controlP5.addKnob("Zoom").setRange(0,100).setValue(0).setPosition(48,100).setRadius(25).setDragDirection(Knob.VERTICAL);
+        ToggleGrid = controlP5.addToggle("Mover_grid").setPosition(48,500).setSize(50,20).setValue(true);
+
+        /*botões para incrementar e decrementar os valores do position*/
+        PositionIncrement = controlP5.addButton("Increment")
+                                     .setValue(22)//valor que será incrementado em valorPosition sempre que o botão for pressionado 
+                                     .setImage(loadImage("+.png"))//imagem que está na pasta do arquivo PDI_frontend_v03
+                                     .setPosition(33,190)//posições x and y
+                                     .setSize(29,48);//largura e altura
+        PositionDecrement = controlP5.addButton("Decrement")
+                                     .setValue(22)
+                                     .setImage(loadImage("-.png"))
+                                     .setPosition(83,190)
+                                     .setSize(29,49);
 
         AxisFont = loadFont("axis.vlw");
         TitleFont = loadFont("Titles.vlw");
         nextRefresh=millis();
         if (outputFileName!="") output = createWriter(outputFileName);
 }
+void Increment() {
+  if (valorPosition < ScaleMaxGlobal) {//se está dentro do limite pode receber
+      valorPosition += PositionIncrement.getValue();//incrimenta 22 "setValue(22)" no valor da posição
+      if (valorPosition > ScaleMaxGlobal) {
+        valorPosition = ScaleMaxGlobal;//se estorou o limite, reseta para 1024 pafa ficar dentro do limite
+      }
+      println(valorPosition);
+      changePosition();
+  } else {
+    println("limite máximo atingido");
+  }
+  
+}
+
+//decrementa o valor da variável valorPositio sempre que o PositionDecrement for pressionado 
+void Decrement (){
+
+  
+  if (valorPosition > ScaleMinGlobal) {//se está dentro do limite pode receber
+      valorPosition -= PositionDecrement.getValue();//decrementa 22 no valor da posição
+      if (valorPosition < ScaleMinGlobal){
+        valorPosition = ScaleMinGlobal; //recebe 0 que é o limite mínimo
+      }
+      println(valorPosition);
+      changePosition();
+  } else {
+    println("limite mínimo atingido");
+  }
+  
+}
+
+void changePosition(){
+        float x = 0;//valor a ser adicionado ou subtraido no limite superior ou inferior da escala para dar efeito de deslizar   
+        if(valorPosition < xAnterior){//se a leitura atual for um numero menor que o lido anteriormente
+          x = -10;
+        }else if(valorPosition > xAnterior){//se a leitura atual for um numero menor que o lido anteriormente
+          x = 10;
+        }
+        println("valor de x: "+x);
+        //aqui testa se asmodificacoes no espaço da janela obedecem os limites globais setados se sim executa o deslize casocontrario nao faz nada
+        if((InScaleMin + x) >= ScaleMinGlobal && (InScaleMax + x) <= ScaleMaxGlobal ){
+          InScaleMin = InScaleMin + x; //aqui esta somando mais nao necessariamente com um numero positivo mas tbm com negativo
+          InScaleMax = InScaleMax + x;//ou seja uma subtracao de acordo com o que foi setado no bloco acima
+          println("dentro do intervalo");
+        }
+        xAnterior = valorPosition;//guarda o valor lido atualmente
+}
+
 //toggle para pausar a execucao do redesenho do programa, usa a variavel pause na funcao draw()
 void Pause(){
         if(!pause){
@@ -133,24 +194,7 @@ void Zoom(){
         InScaleMin = ScaleMinGlobal + x1;
         InScaleMax = ScaleMaxGlobal - x2;
 }
-//Knob,
-void Position(){
-        float x = 0;//valor a ser adicionado ou subtraido no limite superior ou inferior da escala para dar efeito de deslizar
-        println(Knob_position.getValue());
-        if(Knob_position.getValue() < xAnterior){//se a leitura atual for um numero menor que o lido anteriormente
-          x = -5;
-        }else if(Knob_position.getValue() > xAnterior){//se a leitura atual for um numero menor que o lido anteriormente
-          x = 5;
-        }
-        println(x);
-        //aqui testa se asmodificacoes no espaço da janela obedecem os limites globais setados se sim executa o deslize casocontrario nao faz nada
-        if((InScaleMin + x) >= ScaleMinGlobal && (InScaleMax + x) <= ScaleMaxGlobal ){
-          InScaleMin = InScaleMin + x; //aqui esta somando mais nao necessariamente com um numero positivo mas tbm com negativo
-          InScaleMax = InScaleMax + x;//ou seja uma subtracao de acordo com o que foi setado no bloco acima
-          println("dentro do intervalo");
-        }
-        xAnterior = Knob_position.getValue();//guarda o valor lido atualmente
-}
+
 //Button, salva as configuraçoes colocadas nos fields minimoY e maximoY
 void Set_scale(){
         ScaleMinGlobal = Float.parseFloat( MinimoY.getValueLabel().getText());
