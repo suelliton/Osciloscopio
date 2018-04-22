@@ -45,9 +45,9 @@ int windowSpan = 20000;    // number of mS into the past you want to display 300
 int refreshRate = 100;      // how often you want the graph to be reDrawn;
 
 //essa parte nao mudei nada
-//float displayFactor = 1; //display Time as Milliseconds
+float displayFactor = 1; //display Time as Milliseconds
 //float displayFactor = 1000; //display Time as Seconds
-float displayFactor = 60000; //display Time as Minutes
+//float displayFactor = 60000; //display Time as Minutes
 //acredito ser a variavelque guarda o nome do arquivo que iremos salvar
 String outputFileName = ""; // if you'd like to output data to  a file, specify the path here
 /***********************************************
@@ -116,16 +116,16 @@ void setup(){
         ToggleA4 = controlP5.addToggle("A4").setPosition(10,340).setSize(50,20).setValue(true).setMode(ControlP5.SWITCH);
         ToggleA5 = controlP5.addToggle("A5").setPosition(10,375).setSize(50,20).setValue(true).setMode(ControlP5.SWITCH);
         
-        InLabelA0 = controlP5.addTextlabel("In","1",65,205);  
-        InLabelA1 = controlP5.addTextlabel("In2","1",65,240);
-        InLabelA2 = controlP5.addTextlabel("In3","1",65,275);
-        InLabelA3 = controlP5.addTextlabel("In4","1",65,310);
-        InLabelA4 = controlP5.addTextlabel("In5","1",65,345);
-        InLabelA5 = controlP5.addTextlabel("In6","1",65,380);
+        InLabelA0 = controlP5.addTextlabel("In","1",60,200);  
+        InLabelA1 = controlP5.addTextlabel("In","1",10,345);
+        InLabelA2 = controlP5.addTextlabel("In","1",10,345);
+        InLabelA3 = controlP5.addTextlabel("In","1",10,345);
+        InLabelA4 = controlP5.addTextlabel("In","1",10,345);
+        InLabelA5 = controlP5.addTextlabel("In","1",10,345);
         
-        QuadroLabel =controlP5.addTextlabel("Quadro","Quadro: "+(windowSpan*1000)/20000 + " ms",70,420); 
+        QuadroLabel =controlP5.addTextlabel("Quadro","Quadro: "+(windowSpan*1000)/20000 + "ms",10,355); 
         
-        Knob_zoom = controlP5.addKnob("Zoom").setRange(0,100).setValue(0).setPosition(1,100).setRadius(35).setDragDirection(Knob.HORIZONTAL);
+        Knob_zoom = controlP5.addKnob("Zoom").setRange(0,100).setValue(0).setPosition(10,100).setRadius(35).setDragDirection(Knob.HORIZONTAL);
          /*botões para incrementar e decrementar os valores do position*/
         PositionIncrement = controlP5.addButton("Increment")
                                      .setValue(22)//valor que será incrementado em valorPosition sempre que o botão for pressionado 
@@ -140,15 +140,14 @@ void setup(){
         position = controlP5.addTextlabel("a","POSITION",90,175);
         
         
-       
+        PauseButton = controlP5.addButton("Pause",0.0,45,475,60,20);      //
         
         
         //esse slider é a barra deslizante
          //slider = controlP5.addSlider("slider").setRange(100,10000).setValue(10000).setPosition(10,250).setSize(90,20);
-        Knob_time = controlP5.addKnob("Time").setRange(20000,100).setValue(20000).setPosition(10,420).setRadius(35).setDragDirection(Knob.VERTICAL);
+        Knob_time = controlP5.addKnob("Time").setRange(20000,10).setValue(20000).setPosition(25,400).setRadius(35).setDragDirection(Knob.VERTICAL);
        
-        PauseButton = controlP5.addButton("Pause",0.0,10,515,50,20);      //
-        ToggleGrid = controlP5.addToggle("Mover_grid").setPosition(75,515).setSize(50,20).setValue(true);
+        ToggleGrid = controlP5.addToggle("Mover_grid").setPosition(48,500).setSize(50,20).setValue(true);
 
        
 
@@ -226,10 +225,10 @@ void Mover_grid(){
 //Knob, faz calculo de percentagem do valor lido com relacao ao valor de tamanho de tela globalscale
 //e acrescenta este valor na escala minima e subtrai da maxima, pra dar o efeito de zoom
 void Zoom(){
-        float x = (((ScaleMaxGlobal - ScaleMinGlobal)/2)*Knob_zoom.getValue())/100;//é calculado o zoom em porcentagem em cima do valor setado no globalscale        
-        InScaleMin = ScaleMinGlobal + x;
-        InScaleMax = ScaleMaxGlobal - x;
-        println(x);
+        float x1 = (ScaleMinGlobal*Knob_zoom.getValue())/100;//é calculado o zoom em porcentagem em cima do valor setado no globalscale
+        float x2 = (ScaleMaxGlobal*Knob_zoom.getValue())/100;
+        InScaleMin = ScaleMinGlobal + x1;
+        InScaleMax = ScaleMaxGlobal - x2;
 }
 
 //Button, salva as configuraçoes colocadas nos fields minimoY e maximoY
@@ -245,13 +244,14 @@ void Set_scale(){
 void Time(){
         windowSpan = (int) Knob_time.getValue();      
         Quadro = (windowSpan*1000)/20000;
-        if(Quadro <300){
-           movimentarGrid = false;
-        }else{
-          movimentarGrid = true;
-        }
-        if(Quadro <100){
-          refreshRate = 50;
+        if(Quadro >=100){
+            refreshRate = 100; 
+        }else if(Quadro > 50 && Quadro < 100 ){
+          refreshRate = 50;  
+        }else if(Quadro <= 50 && Quadro > 25){
+          refreshRate = 25;  
+        }else if(Quadro <= 25 && Quadro > 0 ){
+          refreshRate = 5;  
         }
         
         arrayLength = windowSpan / refreshRate+1;
@@ -263,7 +263,7 @@ void Time(){
         ioWidth = windowWidth-ioLeft-50;
         ioRight = ioLeft+ioWidth;
         nPoints = 0;
-        pointWidth= (ioWidth+100)/float(arrayLength-1);//coloquei +50 no width
+        pointWidth= (ioWidth)/float(arrayLength-1);
         
         //20000 - 100
         //winspan - x
@@ -458,26 +458,21 @@ void serialEvent(Serial myPort)
   if (s.length ==8){
     //Setpoint = float(s[1]);           // * pull the information
     for(int i = 0 ;i < 6 ; i++){
-      //if(i == 0){
-        INPUTS[i] = float(s[i]);     
-      //} else{        //   we need out of the
-        //INPUTS[i] = 200*i;
-      //}
-    }
-          
-    if(!A0) InLabelA0.setValue("Channel 1 : "+float(s[0]));
-    else InLabelA0.setValue("Channel 1 : disable");
-    if(!A1) InLabelA1.setValue("Channel 2 : "+float(s[1]));
-    else InLabelA1.setValue("Channel 2 : disable");
-    if(!A2) InLabelA2.setValue("Channel 3 : "+float(s[2]));
-    else InLabelA2.setValue("Channel 3 : disable");
-    if(!A3) InLabelA3.setValue("Channel 4 : "+float(s[3]));
-    else InLabelA3.setValue("Channel 4 : disable");
-    if(!A4) InLabelA4.setValue("Channel 5 : "+float(s[4]));
-    else InLabelA4.setValue("Channel 5 : disable");
-    if(!A5) InLabelA5.setValue("Channel 6 : "+float(s[5]));
-    else InLabelA5.setValue("Channel 6 : disable");
-    
+      if(i == 0){
+      INPUTS[i] = float(s[i]);     
+      } else{        //   we need out of the
+      INPUTS[i] = 200*i;
+    }}
+   // println(INPUTS);
+    //Output = float(s[3]);             //   string and put it
+    //SPLabel.setValue(s[1]);           //   where it's needed
+    InLabel.setValue(s[2]);           //
+    //OutLabel.setValue(trim(s[3]));    //
+    //PLabel.setValue(trim(s[4]));      //
+    //ILabel.setValue(trim(s[5]));      //
+    //DLabel.setValue(trim(s[6]));      //
+    //AMCurrent.setValue(trim(s[7]));   //
+    //DRCurrent.setValue(trim(s[8]));
     if(justSent){                    // * if this is the first read
                                      //   since we sent values to
      // SPField.setText(trim(s[1]));    //   the arduino,  take the
