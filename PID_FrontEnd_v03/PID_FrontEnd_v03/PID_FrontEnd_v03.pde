@@ -160,8 +160,9 @@ void setup(){
 
 
 void Increment() {
-  if (valorPosition < ScaleMaxGlobal) {//se está dentro do limite pode receber
-      valorPosition += PositionIncrement.getValue();//incrimenta 22 "setValue(22)" no valor da posição
+  if (InScaleMax+valorPosition < ScaleMaxGlobal) {//se está dentro do limite pode receber
+      InScaleMax += PositionIncrement.getValue();//incrimenta 22 "setValue(22)" no valor da posição
+      InScaleMin += PositionIncrement.getValue();
       if (valorPosition > ScaleMaxGlobal) {
         valorPosition = ScaleMaxGlobal;//se estorou o limite, reseta para 1024 pafa ficar dentro do limite
       }
@@ -177,8 +178,9 @@ void Increment() {
 void Decrement (){
 
   
-  if (valorPosition > ScaleMinGlobal) {//se está dentro do limite pode receber
-      valorPosition -= PositionDecrement.getValue();//decrementa 22 no valor da posição
+  if (InScaleMin+valorPosition > ScaleMinGlobal) {//se está dentro do limite pode receber
+      InScaleMin -= PositionDecrement.getValue();//decrementa 22 no valor da posição
+      InScaleMax -= PositionDecrement.getValue();
       if (valorPosition < ScaleMinGlobal){
         valorPosition = ScaleMinGlobal; //recebe 0 que é o limite mínimo
       }
@@ -449,13 +451,12 @@ byte[] floatArrayToByteArray(float[] input){
 
 
 //take the string the arduino sends us and parse it
-void serialEvent(Serial myPort)
-{
+void serialEvent(Serial myPort){
   String read = myPort.readStringUntil(10);
   if(outputFileName!="") output.print(str(millis())+ " "+read);
   String[] s = split(read, " ");
-  //println(s.length);
-  if (s.length ==8){
+  println("tamanho T" + s.length);
+  if (s.length == 8){
     //Setpoint = float(s[1]);           // * pull the information
     for(int i = 0 ;i < 6 ; i++){
       //if(i == 0){
@@ -489,7 +490,7 @@ void serialEvent(Serial myPort)
      // mode = trim(s[7]);              //
       //AMLabel.setValue(trim(s[7]));         //
       //dr = trim(s[8]);                //
-      //DRCurrent.setValue(trim(s[8]));         //
+      //DRCurrent.setValue(trim(s[8]));         //versao caceteira 2
       justSent=false;                 //
     }                                 //
 
