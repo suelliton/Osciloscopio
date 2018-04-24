@@ -14,7 +14,7 @@ int inputPin[6];
 
 
 unsigned long serialTime; //this will help us know when to talk with processing
-PID myPID(10, 2, 3,0.01,0.28,0, DIRECT);
+PID myPID(&Input[0], &Input[2], &Input[2],0.01,0.28,0, DIRECT);
 void setup(){
   //initialize the serial link with processing
   Serial.begin(9600);  
@@ -23,6 +23,7 @@ void setup(){
     inputPin[i] = i;
   }
   pinMode(6,OUTPUT);
+  myPID.SetMode(AUTOMATIC);
 }
 
 void loop(){
@@ -44,7 +45,6 @@ void loop(){
 
 
 void SerialSend(){
-
        for(int i = 0 ; i < 6 ; i++){
             //Serial.print(Input[i]);
             Serial.print(Input[i]);   
@@ -59,4 +59,3 @@ void SerialSend(){
   else Serial.println("Reverse");
 
 }
-
