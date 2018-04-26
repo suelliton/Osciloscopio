@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 import processing.serial.*;
 import controlP5.*;
+import java.io.*;
+import java.time.Instant;
 
 /***********************************************
  * User spcification section
@@ -87,7 +89,7 @@ boolean justSent = true;
 // declara os elementos de GUI
 Serial myPort;
 ControlP5 controlP5;
-controlP5.Button SetButton, PauseButton, PositionIncrement, PositionDecrement;
+controlP5.Button SetButton, PauseButton, SalveButton, PositionIncrement, PositionDecrement;
 controlP5.Toggle ToggleGrid, ToggleA0,ToggleA1,ToggleA2,ToggleA3,ToggleA4,ToggleA5;
 controlP5.Textlabel escala, position, InLabelA0,InLabelA1,InLabelA2,InLabelA3,InLabelA4,InLabelA5,QuadroLabel;
 controlP5.Textfield MinimoY, MaximoY,InField;
@@ -146,9 +148,9 @@ void setup(){
         //esse slider é a barra deslizante
          //slider = controlP5.addSlider("slider").setRange(100,10000).setValue(10000).setPosition(10,250).setSize(90,20);
         Knob_time = controlP5.addKnob("Time").setRange(20000,100).setValue(20000).setPosition(10,420).setRadius(35).setDragDirection(Knob.VERTICAL);
-       
+                SalveButton = controlP5.addButton("Salvar",0.0,85,450,50,20); 
         PauseButton = controlP5.addButton("Pause",0.0,10,515,50,20);      //
-        ToggleGrid = controlP5.addToggle("Mover_grid").setPosition(75,515).setSize(50,20).setValue(true);
+        ToggleGrid = controlP5.addToggle("Mover_grid").setPosition(85,515).setSize(50,20).setValue(true);
 
        
 
@@ -211,12 +213,45 @@ void changePosition(){
 
 //toggle para pausar a execucao do redesenho do programa, usa a variavel pause na funcao draw()
 void Pause(){
+  
         if(!pause){
           pause = true;
         }else{
           pause = false;
         }
 }
+
+void Salvar(){
+  println("salvou");
+        File root = new File("Dados_" +  Instant.now().getEpochSecond());
+
+        root.mkdirs();
+
+        //uma volta para cada canal do arduino (cada volta cria um arquivo que irá armazenar a linha de dados ma matriz linhas[] [])
+        for (int i = 0; i < 6; i++) {
+            File arquivo = new File(root,"Canal_A" +(i)+".csv");
+
+            try {
+                //cria um arquivo (vazio)
+                arquivo.createNewFile();
+                arquivo.mkdir();
+                //cria um objeto para poder escrever no arquivo
+                FileWriter file = new FileWriter(arquivo);
+
+                for (int col = 0; col < arrayLength; col++) {
+                    file.append(Long.toString(LINHAS[i][col]));
+                    file.append("\n");
+                    file.flush();
+
+                }   //salva os dados no arquivo
+                file.close();
+
+            } catch (IOException ex) {
+            }
+
+        }//END FOR
+}
+
 //toggle para parar a movimentacao só da gridline, usado na funcao drawGraph()
 void Mover_grid(){
        if(!movimentarGrid){
